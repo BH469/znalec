@@ -1,0 +1,199 @@
+
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expert Analýza - Nárazová Rýchlosť</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 10px; display: flex; justify-content: center; }
+        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 100%; max-width: 480px; border: 1px solid #eee; }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; text-transform: uppercase; font-size: 1.1em; }
+        .mode-selector { display: flex; background: #eee; border-radius: 12px; margin-bottom: 20px; padding: 4px; }
+        .mode-btn { flex: 1; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 0.85em; }
+        .active { background: #1a73e8; color: white; }
+        .info-row { margin-bottom: 12px; border-bottom: 1px solid #f8f8f8; padding-bottom: 5px; }
+        .label { font-weight: bold; color: #444; font-size: 0.82em; text-transform: uppercase; }
+        .val { float: right; color: #1a73e8; font-weight: bold; font-size: 1.1em; }
+        input[type=text] { width: 100%; padding: 10px; border: 2px solid #1a73e8; border-radius: 8px; box-sizing: border-box; text-transform: uppercase; margin: 10px 0; font-weight: bold; text-align: center; }
+        input[type=range] { width: 100%; cursor: pointer; margin: 8px 0; height: 8px; border-radius: 5px; background: #ddd; outline: none; -webkit-appearance: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: #1a73e8; border-radius: 50%; border: 2px solid white; }
+        .surface-hint { font-size: 0.85em; color: #666; font-style: italic; text-align: right; font-weight: bold; margin-bottom: 10px; }
+        .chart-container { margin: 20px 0 10px; border-radius: 10px; overflow: hidden; background: #eee; height: 35px; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .segment { height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; transition: width 0.3s; overflow: hidden; }
+        .seg-reakcia { background: #ffca28; color: #333; } 
+        .seg-nabeh { background: #ff9800; }   
+        .seg-brzdenie { background: #f44336; } 
+        .result-box { background: #fff5f5; padding: 15px; border-radius: 15px; text-align: center; border: 2px solid #d32f2f; margin-top: 15px; }
+        .main-res { font-size: 2.8em; font-weight: 900; color: #d32f2f; margin: 5px 0; line-height: 1; }
+        .btn-print { width: 100%; background: #2e7d32; color: white; border: none; padding: 15px; border-radius: 12px; cursor: pointer; margin-top: 20px; font-weight: bold; }
+        @media print { .no-print { display: none !important; } .card { box-shadow: none; border: 2px solid #000; max-width: 100%; } .chart-container, .segment, .result-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Analýza Brzdnej Dráhy Pro</h2>
+    <div class="mode-selector no-print">
+        <button id="btnFwd" class="mode-btn active" onclick="setMode('fwd')">Dopredný výpočet</button>
+        <button id="btnRev" class="mode-btn" onclick="setMode('rev')">Spätný zo stôp</button>
+    </div>
+
+    <div class="info-row">
+        <span class="label">Vozidlo (EČV):</span>
+        <input type="text" id="ecv" placeholder="NAPR. BL-123XY">
+    </div>
+
+    <div id="rowSpeed" class="info-row">
+        <span class="label">Počiatočná rýchlosť (v0):</span>
+        <span class="val" id="vVal">50 km/h</span>
+        <input type="range" class="no-print" id="speed" min="0" max="200" step="5" value="50" oninput="calc()">
+    </div>
+
+    <div id="rowRevParams" style="display:none;">
+        <div class="info-row">
+            <span class="label">Nameraná brzdná stopa (db):</span>
+            <span class="val" id="dVal">15 m</span>
+            <input type="range" class="no-print" id="dist" min="1" max="200" step="0.5" value="15" oninput="calc()">
+        </div>
+        <div class="info-row">
+            <span class="label">Zvyšková (nárazová) rýchlosť (vz):</span>
+            <span class="val" id="vzVal">0 km/h</span>
+            <input type="range" class="no-print" id="vImpact" min="0" max="150" step="5" value="0" oninput="calc()">
+        </div>
+    </div>
+
+    <div class="info-row">
+        <span class="label">Reakčný čas (tr):</span>
+        <span class="val" id="trVal">1.0 s</span>
+        <input type="range" class="no-print" id="tr" min="0.8" max="3.0" step="0.1" value="1.0" oninput="calc()">
+    </div>
+
+    <div class="info-row">
+        <span class="label">Nábeh bŕzd (tn):</span>
+        <span class="val" id="tnVal">0.2 s</span>
+        <input type="range" class="no-print" id="tn" min="0.2" max="1.8" step="0.1" value="0.2" oninput="calc()">
+    </div>
+
+    <div class="info-row" style="border-bottom: none;">
+        <span class="label">Adhézia (μ):</span>
+        <span class="val" id="fVal">0.80</span>
+        <input type="range" class="no-print" id="friction" min="0.1" max="1.0" step="0.01" value="0.8" oninput="calc('friction')">
+        <div id="surfaceHint" class="surface-hint">☀️ Suchý asfalt</div>
+    </div>
+
+    <div class="info-row">
+        <span class="label">Spomalenie (a):</span>
+        <span class="val" id="aVal">7.8 m/s²</span>
+        <input type="range" class="no-print" id="accel" min="0.5" max="10.0" step="0.1" value="7.8" oninput="calc('accel')">
+    </div>
+
+    <div class="info-row">
+        <span class="label">Sklon vozovky:</span>
+        <span class="val" id="sVal">0 %</span>
+        <input type="range" class="no-print" id="slope" min="-15" max="15" step="1" value="0" oninput="calc()">
+    </div>
+
+    <div class="chart-container">
+        <div id="segR" class="segment seg-reakcia">R</div>
+        <div id="segN" class="segment seg-nabeh">N</div>
+        <div id="segB" class="segment seg-brzdenie">B</div>
+    </div>
+
+    <div class="result-box">
+        <span class="label" id="resLabel">Celková dráha zastavenia</span>
+        <div class="main-res" id="resMain">0.0 m</div>
+        <div style="font-size: 0.85em; font-weight: bold; color: #666; margin-top:10px;">
+            R: <span id="rM">0</span>m | N: <span id="nM">0</span>m | B: <span id="bM">0</span>m
+        </div>
+    </div>
+
+    <button class="btn-print no-print" onclick="window.print()">📄 GENEROVAŤ PDF PROTOKOL</button>
+</div>
+
+<script>
+const G = 9.81;
+let mode = 'fwd';
+
+function setMode(m) {
+    mode = m;
+    document.getElementById('btnFwd').classList.toggle('active', m === 'fwd');
+    document.getElementById('btnRev').classList.toggle('active', m === 'rev');
+    document.getElementById('rowSpeed').style.display = m === 'fwd' ? 'block' : 'none';
+    document.getElementById('rowRevParams').style.display = m === 'rev' ? 'block' : 'none';
+    document.getElementById('resLabel').innerText = m === 'fwd' ? 'Celková dráha zastavenia' : 'Počiatočná rýchlosť (v0)';
+    calc();
+}
+
+function calc(source) {
+    const tr = parseFloat(document.getElementById('tr').value);
+    const tn = parseFloat(document.getElementById('tn').value);
+    const sPct = parseFloat(document.getElementById('slope').value);
+    let f = parseFloat(document.getElementById('friction').value);
+    let a = parseFloat(document.getElementById('accel').value);
+
+    if (source === 'friction') { a = f * G; document.getElementById('accel').value = a.toFixed(1); }
+    else if (source === 'accel') { f = a / G; document.getElementById('friction').value = f.toFixed(2); }
+    
+    const aEff = a + (G * (sPct/100));
+
+    document.getElementById('trVal').innerText = tr.toFixed(1) + " s";
+    document.getElementById('tnVal').innerText = tn.toFixed(1) + " s";
+    document.getElementById('fVal').innerText = f.toFixed(2);
+    document.getElementById('aVal').innerText = a.toFixed(1) + " m/s²";
+    document.getElementById('sVal').innerText = (sPct > 0 ? "+" : "") + sPct + " %";
+    document.getElementById('surfaceHint').innerText = f <= 0.15 ? "🧊 Poľadovica" : f <= 0.3 ? "❄️ Sneh" : f <= 0.5 ? "🌧️ Mokro" : f <= 0.7 ? "🛣️ Starý asfalt" : "☀️ Suchý asfalt";
+
+    let vMs, dR, dN, dB, dTotal, vKmH;
+
+    if (mode === 'fwd') {
+        vKmH = parseFloat(document.getElementById('speed').value);
+        vMs = vKmH / 3.6;
+        document.getElementById('vVal').innerText = vKmH + " km/h";
+        
+        dR = vMs * tr;
+        dN = (vMs * tn) - ((a * tn * tn) / 6);
+        const vEndN = Math.max(0, vMs - ((a * tn) / 2));
+        dB = (aEff > 0 && vEndN > 0) ? (vEndN * vEndN) / (2 * aEff) : 0;
+        dTotal = dR + dN + dB;
+        
+        document.getElementById('resMain').innerText = dTotal.toFixed(1) + " m";
+    } else {
+        dB = parseFloat(document.getElementById('dist').value);
+        const vImpactKmH = parseFloat(document.getElementById('vImpact').value);
+        const vImpactMs = vImpactKmH / 3.6;
+        
+        document.getElementById('dVal').innerText = dB.toFixed(1) + " m";
+        document.getElementById('vzVal').innerText = vImpactKmH + " km/h";
+        
+        // Spätný výpočet: v_endN^2 = v_z^2 + 2*a*dB
+        const vEndN = Math.sqrt(Math.pow(vImpactMs, 2) + (2 * aEff * dB));
+        
+        // Počiatočná rýchlosť: v0 = v_endN + (a * tn / 2)
+        vMs = vEndN + (a * tn / 2);
+        vKmH = vMs * 3.6;
+        
+        dR = vMs * tr;
+        dN = (vMs * tn) - ((a * tn * tn) / 6);
+        dTotal = dR + dN + dB;
+
+        document.getElementById('resMain').innerText = vKmH.toFixed(1) + " km/h";
+    }
+
+    document.getElementById('rM').innerText = dR.toFixed(1);
+    document.getElementById('nM').innerText = dN.toFixed(1);
+    document.getElementById('bM').innerText = dB.toFixed(1);
+
+    const sum = dR + dN + dB;
+    document.getElementById('segR').style.width = (dR / sum * 100) + "%";
+    document.getElementById('segR').innerText = dR.toFixed(1) + "m";
+    document.getElementById('segN').style.width = (dN / sum * 100) + "%";
+    document.getElementById('segN').innerText = dN.toFixed(1) + "m";
+    document.getElementById('segB').style.width = (dB / sum * 100) + "%";
+    document.getElementById('segB').innerText = dB.toFixed(1) + "m";
+}
+
+window.onload = () => setMode('fwd');
+</script>
+</body>
+</html>
